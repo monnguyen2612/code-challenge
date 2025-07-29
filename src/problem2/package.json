@@ -1,0 +1,25 @@
+{
+  "name": "currency-swap-app",
+  "version": "1.0.0",
+  "description": "Modern currency swap application built with Vite",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "terser": "^5.24.0"
+  },
+  "keywords": [
+    "defi",
+    "swap",
+    "cryptocurrency",
+    "vite",
+    "javascript"
+  ],
+  "author": "99Tech Code Challenge",
+  "license": "MIT"
+} 

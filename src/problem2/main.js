@@ -1,4 +1,30 @@
-// Currency Swap Application
+import './style.css'
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function throttle(func, limit) {
+  let inThrottle;
+  return function() {
+    const args = arguments;
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  }
+}
+
 class CurrencySwapApp {
   constructor() {
     this.tokens = [];
@@ -7,22 +33,35 @@ class CurrencySwapApp {
     this.selectedToToken = 'ETH';
     this.userBalances = {};
     this.recentTransactions = [];
+    this.isInitialized = false;
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+    } else {
+      this.init();
+    }
+  }
+
+  init() {
+    if (this.isInitialized) return;
     
     this.initializeElements();
     this.loadTokens();
     this.loadPrices();
     this.setupEventListeners();
     this.updateBalances();
+    
+    this.isInitialized = true;
+    
+    document.body.classList.add('app-ready');
   }
 
   initializeElements() {
-    // Form elements
     this.form = document.getElementById('swapForm');
     this.fromAmountInput = document.getElementById('fromAmount');
     this.toAmountInput = document.getElementById('toAmount');
     this.swapBtn = document.getElementById('swapBtn');
     
-    // Token selectors
     this.fromTokenSelector = document.getElementById('fromTokenSelector');
     this.toTokenSelector = document.getElementById('toTokenSelector');
     this.fromTokenIcon = document.getElementById('fromTokenIcon');
@@ -30,24 +69,19 @@ class CurrencySwapApp {
     this.toTokenIcon = document.getElementById('toTokenIcon');
     this.toTokenSymbol = document.getElementById('toTokenSymbol');
     
-    // Balance displays
     this.fromBalance = document.getElementById('fromBalance');
     this.toBalance = document.getElementById('toBalance');
     
-    // Error messages
     this.fromError = document.getElementById('fromError');
     this.toError = document.getElementById('toError');
     
-    // Exchange info
     this.exchangeInfo = document.getElementById('exchangeInfo');
     this.exchangeRate = document.getElementById('exchangeRate');
     this.networkFee = document.getElementById('networkFee');
     
-    // Buttons
     this.maxFromBtn = document.getElementById('maxFromBtn');
     this.swapDirectionBtn = document.getElementById('swapDirectionBtn');
     
-    // Modals
     this.tokenModal = document.getElementById('tokenModal');
     this.successModal = document.getElementById('successModal');
     this.modalClose = document.getElementById('modalClose');
@@ -56,15 +90,12 @@ class CurrencySwapApp {
     this.tokenList = document.getElementById('tokenList');
     this.modalTitle = document.getElementById('modalTitle');
     
-    // Transaction list
     this.transactionList = document.getElementById('transactionList');
     
-    // Modal state
-    this.currentModalToken = null; // 'from' or 'to'
+    this.currentModalToken = null;
   }
 
   async loadTokens() {
-    // Available tokens with their icons
     this.tokens = [
       { symbol: 'SWTH', name: 'Switcheo Token', icon: 'https://raw.githubusercontent.com/Switcheo/token-icons/main/tokens/SWTH.svg' },
       { symbol: 'ETH', name: 'Ethereum', icon: 'https://raw.githubusercontent.com/Switcheo/token-icons/main/tokens/ETH.svg' },
@@ -78,7 +109,6 @@ class CurrencySwapApp {
       { symbol: 'UNI', name: 'Uniswap', icon: 'https://raw.githubusercontent.com/Switcheo/token-icons/main/tokens/UNI.svg' }
     ];
     
-    // Set default balances
     this.userBalances = {
       'SWTH': 1000.0,
       'ETH': 5.0,
@@ -95,17 +125,27 @@ class CurrencySwapApp {
 
   async loadPrices() {
     try {
-      const response = await fetch('https://interview.switcheo.com/prices.json');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch('https://interview.switcheo.com/prices.json', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const priceData = await response.json();
       
-      // Process price data
       priceData.forEach(item => {
         if (item.currency && item.price) {
           this.prices[item.currency] = parseFloat(item.price);
         }
       });
       
-      // Set default prices for tokens not in the API
       const defaultPrices = {
         'SWTH': 0.1,
         'ETH': 2000,
@@ -119,13 +159,11 @@ class CurrencySwapApp {
         'UNI': 20
       };
       
-      // Merge API prices with defaults
       this.prices = { ...defaultPrices, ...this.prices };
       
       this.updateExchangeInfo();
     } catch (error) {
       console.error('Error loading prices:', error);
-      // Use default prices if API fails
       this.prices = {
         'SWTH': 0.1,
         'ETH': 2000,
@@ -142,22 +180,19 @@ class CurrencySwapApp {
   }
 
   setupEventListeners() {
-    // Form submission
     this.form.addEventListener('submit', (e) => {
       e.preventDefault();
       this.handleSwap();
     });
 
-    // Amount input changes
-    this.fromAmountInput.addEventListener('input', () => {
+    this.fromAmountInput.addEventListener('input', debounce(() => {
       this.handleFromAmountChange();
-    });
+    }, 300));
 
-    this.toAmountInput.addEventListener('input', () => {
+    this.toAmountInput.addEventListener('input', debounce(() => {
       this.handleToAmountChange();
-    });
+    }, 300));
 
-    // Token selectors
     this.fromTokenSelector.addEventListener('click', () => {
       this.openTokenModal('from');
     });
@@ -166,17 +201,14 @@ class CurrencySwapApp {
       this.openTokenModal('to');
     });
 
-    // Max button
     this.maxFromBtn.addEventListener('click', () => {
       this.setMaxAmount();
     });
 
-    // Swap direction button
     this.swapDirectionBtn.addEventListener('click', () => {
       this.swapTokens();
     });
 
-    // Modal events
     this.modalClose.addEventListener('click', () => {
       this.closeTokenModal();
     });
@@ -185,12 +217,10 @@ class CurrencySwapApp {
       this.closeSuccessModal();
     });
 
-    // Token search
-    this.tokenSearch.addEventListener('input', () => {
+    this.tokenSearch.addEventListener('input', throttle(() => {
       this.filterTokens();
-    });
+    }, 100));
 
-    // Click outside modal to close
     this.tokenModal.addEventListener('click', (e) => {
       if (e.target === this.tokenModal) {
         this.closeTokenModal();
@@ -203,7 +233,6 @@ class CurrencySwapApp {
       }
     });
 
-    // Focus events for better UX
     this.fromAmountInput.addEventListener('focus', () => {
       document.querySelector('.token-section').classList.add('focused');
     });
@@ -287,7 +316,6 @@ class CurrencySwapApp {
     this.exchangeRate.textContent = `1 ${this.selectedFromToken} = ${rate.toFixed(6)} ${this.selectedToToken}`;
     this.exchangeInfo.style.display = 'block';
     
-    // Update network fee based on token
     const fees = {
       'ETH': '$2.50',
       'BTC': '$5.00',
@@ -380,7 +408,7 @@ class CurrencySwapApp {
       const tokenItem = document.createElement('div');
       tokenItem.className = 'token-item';
       tokenItem.innerHTML = `
-        <img src="${token.icon}" alt="${token.symbol}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiM2NjdFRUEiLz4KPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0id2hpdGUiIHN0eWxlPSJtYXJnaW46IDhweCI+CjxwYXRoIGQ9Ik04IDJMMTIgNkw4IDEwTDEyIDE0TDggMThMMiAxNEw2IDEwTDIgNkw4IDJaIi8+Cjwvc3ZnPgo8L3N2Zz4K'">
+        <img src="${token.icon}" alt="${token.symbol}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiM2NjdFRUEiLz4KPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0id2hpdGUiIHN0eWxlPSJtYXJnaW46IDhweCI+CjxwYXRoIGQ9Ik04IDJMMTIgNkw4IDEwTDEyIDE0TDggMThMMiAxNEw2IDEwTDIgNkw4IDJaIi8+Cjwvc3ZnPgo8L3N2Zz4K'">
         <div class="token-item-info">
           <div class="token-item-symbol">${token.symbol}</div>
           <div class="token-item-name">${token.name}</div>
@@ -433,21 +461,18 @@ class CurrencySwapApp {
       return;
     }
     
-    // Show loading state
     this.swapBtn.classList.add('loading');
     const btnText = this.swapBtn.querySelector('.btn-text');
     const spinner = this.swapBtn.querySelector('.loading-spinner');
     
+    btnText.textContent = '';
     spinner.style.display = 'block';
     
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Update balances
     this.userBalances[this.selectedFromToken] -= fromAmount;
     this.userBalances[this.selectedToToken] += toAmount;
     
-    // Add transaction to history
     this.addTransaction({
       from: { symbol: this.selectedFromToken, amount: fromAmount },
       to: { symbol: this.selectedToToken, amount: toAmount },
@@ -455,30 +480,25 @@ class CurrencySwapApp {
       timestamp: new Date()
     });
     
-    // Reset form
     this.fromAmountInput.value = '';
     this.toAmountInput.value = '';
     this.fromError.textContent = '';
     this.toError.textContent = '';
     this.exchangeInfo.style.display = 'none';
     
-    // Reset button
     this.swapBtn.classList.remove('loading');
     btnText.textContent = 'Enter an amount';
     spinner.style.display = 'none';
     this.swapBtn.disabled = true;
     
-    // Update displays
     this.updateBalances();
     
-    // Show success modal
     this.showSuccessModal(fromAmount, toAmount);
   }
 
   addTransaction(transaction) {
     this.recentTransactions.unshift(transaction);
     
-    // Keep only last 5 transactions
     if (this.recentTransactions.length > 5) {
       this.recentTransactions = this.recentTransactions.slice(0, 5);
     }
@@ -517,7 +537,4 @@ class CurrencySwapApp {
   }
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new CurrencySwapApp();
-});
+new CurrencySwapApp(); 
