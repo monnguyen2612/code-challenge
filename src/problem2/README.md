@@ -1,6 +1,7 @@
 # Problem 2: Currency Swap Form
 
 ## Solution Overview
+<img width="1512" height="945" alt="Screenshot 2025-07-29 at 19 00 31" src="https://github.com/user-attachments/assets/c8e8258f-5973-456f-8bec-935de7b83f84" />
 
 A modern, feature-rich currency swap application built with vanilla JavaScript, HTML, and CSS. The application provides an intuitive interface for swapping tokens with real-time conversion, validation, and a beautiful user experience.
 
